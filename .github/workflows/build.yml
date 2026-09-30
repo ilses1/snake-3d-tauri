@@ -49,7 +49,7 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: tauri-app/package-lock.json
 
@@ -113,21 +113,26 @@ jobs:
             exit "$code"
           fi
 
-      # 产物路径按平台/架构各不相同（universal 构建在 target/universal-apple-darwin/ 下），
-      # 因此用 find 实搜 bundle 目录，而不是硬编码通配符。
-      - name: 校验产物
+      # 产物路径按平台/架构各不相同（universal 构建落在 target/universal-apple-darwin/ 下），
+      # 因此先把安装包实体收集到统一目录再上传，避免依赖 glob 的路径推断。
+      - name: 收集安装包
         shell: bash
         run: |
-          mapfile -t files < <(find tauri-app/src-tauri/target -type f \
-            -path '*/release/bundle/*' \
+          mkdir -p dist-artifacts
+          find tauri-app/src-tauri/target -type f -path '*/release/bundle/*' \
             \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \
-               -o -name '*.deb' -o -name '*.AppImage' -o -name '*.rpm' \) | sort)
-          if [ "${#files[@]}" -gt 0 ]; then
-            printf '%s\n' "${files[@]}" | xargs -I{} ls -lh {}
-          fi
-          echo "本平台产物数量: ${#files[@]}"
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error title=无产物 (${{ matrix.label }})::未生成任何安装包，请查看打包日志"
+               -o -name '*.deb' -o -name '*.AppImage' -o -name '*.rpm' \) \
+            -exec cp -v {} dist-artifacts/ \;
+          echo "--- 收集结果 ---"
+          ls -lh dist-artifacts/ || true
+          count=$(ls -1 dist-artifacts/ 2>/dev/null | wc -l)
+          echo "本平台产物数量: $count"
+          if [ "$count" -eq 0 ]; then
+            echo "--- bundle 目录实际内容（诊断）---"
+            find tauri-app/src-tauri/target -maxdepth 5 -name bundle -type d -exec sh -c 'echo "[{}]"; ls -1 "{}"' \;
+            find tauri-app/src-tauri/target -maxdepth 6 -type d -name '*.app' | head -10
+            detail=$(find tauri-app/src-tauri/target -maxdepth 5 -name bundle -type d -exec sh -c 'echo "[{}]:"; ls -1 "{}"' \; | head -14 | tr '\n' ' ')
+            echo "::error title=无产物 (${{ matrix.label }})::bundle 目录内容 ${detail}"
             exit 1
           fi
 
@@ -137,12 +142,7 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           if-no-files-found: warn
-          path: |
-            tauri-app/src-tauri/target/**/release/bundle/nsis/*.exe
-            tauri-app/src-tauri/target/**/release/bundle/dmg/*.dmg
-            tauri-app/src-tauri/target/**/release/bundle/deb/*.deb
-            tauri-app/src-tauri/target/**/release/bundle/appimage/*.AppImage
-            tauri-app/src-tauri/target/**/release/bundle/rpm/*.rpm
+          path: dist-artifacts/*
 
   release:
     name: 发布 Release
@@ -159,18 +159,23 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: 校验待发布产物
+      # 下载下来的文件可能位于各 artifact 的子目录中，先实搜收集再发布，
+      # 避免 release-assets/* 只匹配到目录导致「job 成功但 Release 无资产」。
+      - name: 收集待发布文件
         shell: bash
         run: |
-          files=$(find release-assets -type f \
+          mkdir -p upload
+          find release-assets -type f \
             \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \
-               -o -name '*.deb' -o -name '*.AppImage' -o -name '*.rpm' \) | sort)
-          if [ -n "$files" ]; then
-            printf '%s\n' "$files" | xargs -I{} ls -lh {}
-          fi
-          count=$(printf '%s' "$files" | grep -c . || true)
+               -o -name '*.deb' -o -name '*.AppImage' -o -name '*.rpm' \) \
+            -exec cp -v {} upload/ \;
+          echo "--- 待发布文件 ---"
+          ls -lh upload/ || true
+          count=$(ls -1 upload/ 2>/dev/null | wc -l)
           echo "待发布文件数: $count"
           if [ "$count" -eq 0 ]; then
+            echo "--- release-assets 实际内容（诊断）---"
+            find release-assets -maxdepth 3 | head -30
             echo "::error title=无可发布产物::所有平台均未产出安装包"
             exit 1
           fi
@@ -178,5 +183,5 @@ jobs:
       - name: 发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/*
+          files: upload/*
           generate_release_notes: true
