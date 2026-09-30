@@ -1,0 +1,15 @@
+{
+  "name": "snake3d-tauri",
+  "version": "1.0.1",
+  "private": true,
+  "description": "3D 贪吃蛇桌面版（Tauri）",
+  "scripts": {
+    "sync": "node sync-ui.mjs",
+    "dev": "npm run sync && tauri dev",
+    "build": "npm run sync && tauri build",
+    "build:exe": "npm run sync && tauri build --no-bundle"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

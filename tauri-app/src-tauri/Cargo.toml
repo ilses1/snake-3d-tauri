@@ -1,0 +1,24 @@
+[package]
+name = "snake3d"
+version = "1.0.1"
+description = "3D 贪吃蛇桌面版（Tauri）"
+authors = ["wusandao <wusandao@163.com>"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+# indexmap 1.9.3 的 [features] 缺 default = ["std"]，其 build.rs 依赖 autocfg 探测
+# sysroot，在本机判定失败会退化成 no_std 分支，导致 schemars 0.8（tauri-utils 依赖）
+# 的 `IndexMap<K, V>` 少一个泛型参数而编译报错。显式打开 std 即可。
+indexmap = { version = "1.9", features = ["std"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+indexmap = { version = "1.9", features = ["std"] }
+
+[profile.release]
+strip = true
+panic = "abort"
