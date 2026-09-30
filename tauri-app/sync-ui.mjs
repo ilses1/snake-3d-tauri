@@ -18,5 +18,5 @@ const out = src.replace(CDN, './three.module.js');
 const uiDir = path.join(here, 'ui');
 fs.mkdirSync(uiDir, { recursive: true });
 fs.writeFileSync(path.join(uiDir, 'index.html'), out);
-fs.copyFileSync(path.join(root, 'desktop/three.module.js'), path.join(uiDir, 'three.module.js'));
+fs.copyFileSync(path.join(here, 'vendor/three.module.js'), path.join(uiDir, 'three.module.js'));
 console.log('[sync-ui] 已生成 ui/index.html（' + (out.length / 1024).toFixed(1) + ' KB）+ three.module.js');

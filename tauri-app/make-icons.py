@@ -1,11 +1,13 @@
-# 由 desktop/icon.png（1024x1024）生成 Tauri 需要的图标：
-#   icons/32x32.png, icons/128x128.png, icons/icon.png, icons/icon.ico
+# 由 tauri-app/icon.png（1024x1024）生成 Tauri 需要的图标：
+#   icons/32x32.png, icons/128x128.png, icons/icon.png, icons/icon.ico, icons/icon.icns
+# 说明：正式全套图标建议用 `npx tauri icon icon.png -o src-tauri/icons` 生成；
+#       本脚本是不依赖 npm 的备用方案（其中 icns 由 Pillow 写出）。
 # 用法：C:/Python314/python.exe tauri-app/make-icons.py
 from PIL import Image
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.join(os.pardir, 'desktop', 'icon.png')
+SRC = os.path.join(HERE, 'icon.png')
 OUT = os.path.join(HERE, 'src-tauri', 'icons')
 os.makedirs(OUT, exist_ok=True)
 

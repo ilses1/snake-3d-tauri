@@ -1,6 +1,6 @@
 {
   "name": "snake3d-tauri",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "3D 贪吃蛇桌面版（Tauri）",
   "scripts": {

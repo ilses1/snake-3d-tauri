@@ -1,6 +1,6 @@
 # 🐍 Snake 3D · 3D 贪吃蛇
 
-用 Three.js 打造的 3D 贪吃蛇游戏 —— 提供开箱即用的网页版（单 HTML 文件）与 Electron 桌面版（Windows 便携 exe）。
+用 Three.js 打造的 3D 贪吃蛇游戏 —— 网页版是零依赖单 HTML 文件，桌面版基于 **Tauri 2**（Rust + 系统 WebView），提供 Windows / macOS / Linux 三平台安装包。
 
 <p align="center">
   <img src="docs/screenshot-start.png" width="45%" alt="开始界面" />
@@ -18,7 +18,7 @@
 - **手感调校**：帧率无关的固定步长模拟 + 帧间插值，转向队列防止快速连按丢失输入
 - **完整规则**：自撞判定含"尾部让位"细节、吃到食物随机刷新且不与蛇身重叠、逐级加速（12 档封顶），进食时能看到食物沿身体滑向尾部的吞咽鼓包
 - **细节体验**：死亡震屏 + 红闪、8-bit 音效、失焦自动暂停、最高分本地存档
-- **跨端**：网页版零依赖单文件；桌面版完全离线，GPU 异常时自动降级软件渲染
+- **跨端**：网页版零依赖单文件；桌面版基于 Tauri 2，three.js 随包分发、完全离线，安装包体积仅个位数 MB
 
 ## 🎮 操作
 
@@ -48,13 +48,17 @@ python -m http.server 8080   # 或 npx serve .
 
 ### 桌面版
 
-到 [Releases](https://github.com/ilses1/snake-3d/releases) 下载对应平台的安装包，无需自行编译：
+到 [Releases](https://github.com/ilses1/snake-3d-tauri/releases) 下载对应平台的安装包，无需自行编译：
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `Snake3D-Portable.exe` | 免安装便携版，双击即玩 |
-| macOS | `Snake3D-*-arm64.dmg` / `Snake3D-*-x64.dmg` | Apple 芯片选 arm64，Intel 选 x64 |
-| Linux | `Snake3D-*.AppImage` / `Snake3D-*.deb` | AppImage 通用；deb 适用于 Debian/Ubuntu |
+| Windows | `Snake3D_*_x64-setup.exe` | NSIS 安装包，双击安装（当前用户级，无需管理员） |
+| macOS | `Snake3D_*_universal.dmg` | 通用二进制，Intel 与 Apple 芯片通用 |
+| Linux | `Snake3D_*_amd64.AppImage` / `Snake3D_*_amd64.deb` | AppImage 免安装通用；deb 适用于 Debian / Ubuntu |
+
+<p align="center">
+  <img src="docs/tauri-local-test.png" width="70%" alt="Tauri 桌面版运行画面" />
+</p>
 
 > 构建产物未做代码签名，首次打开可能被系统拦截：
 > **Windows** 在 SmartScreen 提示中点「更多信息 → 仍要运行」；
@@ -63,30 +67,34 @@ python -m http.server 8080   # 或 npx serve .
 
 #### 从源码构建
 
+需要 [Rust 工具链](https://rustup.rs/) 与 [Node.js](https://nodejs.org/)（Linux 另需 `libwebkit2gtk-4.1-dev`、`libappindicator3-dev`、`librsvg2-dev`、`patchelf`）。
+
 ```bash
-cd desktop
-npm install          # 安装 Electron 与打包工具
-npm start            # 开发模式直接运行
-npm run dist         # Windows：dist/Snake3D-Portable.exe
-npm run dist:linux   # Linux：AppImage + deb
-npm run dist:mac     # macOS：dmg + zip（x64 与 arm64）
+cd tauri-app
+npm install                  # 安装 Tauri CLI
+npm run sync                 # 由 web/index.html 生成 ui/（three.js 换成本地文件）
+npm run dev                  # 开发模式直接运行
+npm run build                # 打当前平台安装包
+npx tauri build --bundles nsis          # Windows
+npx tauri build --bundles deb,appimage  # Linux
+npx tauri build --target universal-apple-darwin --bundles dmg   # macOS 通用包
 ```
 
-> 桌面版将 three.js 随包分发，运行时**完全离线**；主进程内置仅监听 127.0.0.1 的本地静态服务托管页面。
+> 桌面版把 three.js 随包分发，运行时**完全离线**；界面由系统 WebView 渲染，无需额外运行时（Windows 首次会自动安装 WebView2）。
 > 一般不需要本地构建：推送 tag 后 GitHub Actions 会自动完成三平台打包并发布到 Release。
 
 ## 📁 目录结构
 
 ```
-├── web/                 # 网页版（单 HTML 文件，CDN 引入 three.js）
-├── desktop/             # Electron 桌面版
-│   ├── main.js          # 主进程：本地静态服务 + 窗口管理 + GPU 降级
-│   ├── index.html       # 由 web/index.html 同步生成（npm run sync）
-│   ├── three.module.js  # 随包分发的 three.js r161
-│   ├── scripts/sync-web.mjs
+├── web/                        # 网页版（单 HTML 文件，CDN 引入 three.js）
+├── tauri-app/                  # 桌面版（Tauri 2）
+│   ├── src-tauri/              # Rust 侧：窗口配置、图标、构建脚本
+│   │   └── tauri.conf.json
+│   ├── vendor/three.module.js  # 随包分发的 three.js r161
+│   ├── sync-ui.mjs             # 由 web/index.html 生成 ui/（ui 不入库）
 │   └── package.json
-├── docs/                # 截图
-└── .github/workflows/   # CI：打 tag 自动打包三平台安装包并发布 Release；main 变更自动部署 Pages
+├── docs/                       # 截图
+└── .github/workflows/          # CI：打 tag 自动打包三平台安装包并发布 Release；web/ 变更自动部署 Pages
 ```
 
 ## 🛠 技术要点
@@ -96,13 +104,13 @@ npm run dist:mac     # macOS：dmg + zip（x64 与 arm64）
 - **程序化音乐**：前瞻调度器按十六分音符排音（主旋律 / 双振荡器低音 / 噪声打击），只在音频上下文 `running` 且游戏进行中排音，避免浏览器无手势时积压音符
 - **自撞判定**：蛇尾本回合会移开的格子不算碰撞（仅在吃食物增长时例外），这是经典贪吃蛇最容易写错的细节
 - **镜头控制**：偏航角用最短角差插值（angleLerp），蛇急转弯时相机平滑跟随而非瞬间切换
-- **桌面版健壮性**：GPU 进程连续崩溃 3 次自动写入标记并以软件渲染重启，保证虚拟机 / 远程桌面环境可玩
+- **桌面端技术栈**：Tauri 2（Rust 外壳 + 系统 WebView）承载同一份网页代码，安装包体积从 Electron 方案的 ~100 MB 降到个位数 MB，内存占用也更低
 
 ## 📦 发布新版本
 
 ```bash
-git tag v1.0.1
-git push origin v1.0.1     # CI 并行打包 Windows / macOS / Linux 并附到 GitHub Release
+git tag v1.0.2
+git push origin v1.0.2     # CI 并行打包 Windows / macOS / Linux 并附到 GitHub Release
 ```
 
 ## License
